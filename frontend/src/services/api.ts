@@ -10,6 +10,11 @@ import type {
   RouteInspectionResponse,
   LiveRoadInspectResponse
 } from '../types';
+import {
+  calculateRouteAndInspectClient,
+  searchLocationsClient,
+  CURATED_TN_LOCATIONS
+} from './routingClient';
 
 const API_BASE = '/api';
 
@@ -225,17 +230,43 @@ export const api = {
 
   // India-Wide Routing & Road Inspection
   async searchLocations(query: string, limit: number = 10): Promise<LocationSuggestion[]> {
-    const params = new URLSearchParams({ query, limit: limit.toString() });
-    const res = await fetch(`${API_BASE}/routing/search?${params.toString()}`);
-    if (!res.ok) throw new Error('Failed to search locations');
-    return res.json();
+    try {
+      const params = new URLSearchParams({ query, limit: limit.toString() });
+      const res = await fetch(`${API_BASE}/routing/search?${params.toString()}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) return data;
+      }
+    } catch {
+      // Fall through to client engine
+    }
+    return searchLocationsClient(query, limit);
   },
 
   async reverseGeocode(lat: number, lng: number): Promise<LocationSuggestion> {
-    const params = new URLSearchParams({ lat: lat.toString(), lng: lng.toString() });
-    const res = await fetch(`${API_BASE}/routing/reverse?${params.toString()}`);
-    if (!res.ok) throw new Error('Failed to reverse geocode coordinate');
-    return res.json();
+    try {
+      const params = new URLSearchParams({ lat: lat.toString(), lng: lng.toString() });
+      const res = await fetch(`${API_BASE}/routing/reverse?${params.toString()}`);
+      if (res.ok) return await res.json();
+    } catch {
+      // Fall through
+    }
+    // Client-side fallback: check curated first
+    for (const loc of CURATED_TN_LOCATIONS) {
+      const dLat = loc.lat - lat;
+      const dLng = loc.lng - lng;
+      if (Math.sqrt(dLat * dLat + dLng * dLng) < 0.05) {
+        return loc;
+      }
+    }
+    return {
+      name: `GPS Point (${lat.toFixed(4)}, ${lng.toFixed(4)})`,
+      display_name: `Location at ${lat.toFixed(4)} N, ${lng.toFixed(4)} E, Tamil Nadu`,
+      lat,
+      lng,
+      district: 'Tamil Nadu',
+      state: 'Tamil Nadu'
+    };
   },
 
   async calculateRouteAndInspect(
@@ -246,20 +277,27 @@ export const api = {
     rangeStartKm?: number,
     rangeLengthKm?: number
   ): Promise<RouteInspectionResponse> {
-    const res = await fetch(`${API_BASE}/routing/route`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        source,
-        destination,
-        road_name: roadName,
-        route_index: routeIndex ?? 0,
-        range_start_km: rangeStartKm ?? 0.0,
-        range_length_km: rangeLengthKm ?? 10.0
-      }),
-    });
-    if (!res.ok) throw new Error('Failed to calculate road route and defect telemetry');
-    return res.json();
+    try {
+      const res = await fetch(`${API_BASE}/routing/route`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          source,
+          destination,
+          road_name: roadName,
+          route_index: routeIndex ?? 0,
+          range_start_km: rangeStartKm ?? 0.0,
+          range_length_km: rangeLengthKm ?? 10.0
+        }),
+      });
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch (err) {
+      console.warn('Backend routing unavailable, failing over to client-side OSRM routing engine:', err);
+    }
+    // Failover to robust client-side OSRM and defect correlation engine
+    return calculateRouteAndInspectClient(source, destination, roadName, routeIndex, rangeStartKm, rangeLengthKm);
   },
 
   async generateRouteReport(payload: {

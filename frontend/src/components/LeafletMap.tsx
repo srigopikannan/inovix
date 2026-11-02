@@ -317,11 +317,11 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
 
   // 3. Center or zoom when selectedRoad changes
   useEffect(() => {
-    if (!mapInstanceRef.current || !selectedRoad) return;
+    if (!mapInstanceRef.current || !selectedRoad || (routeSegments && routeSegments.length > 0)) return;
     const centerLat = (selectedRoad.start_lat + selectedRoad.end_lat) / 2;
     const centerLng = (selectedRoad.start_lng + selectedRoad.end_lng) / 2;
     mapInstanceRef.current.setView([centerLat, centerLng], 13);
-  }, [selectedRoad?.id]);
+  }, [selectedRoad?.id, routeSegments?.length]);
 
   // 4. Focus 10 KM Corridor action (fits exact stored route coordinates)
   const focus10KmCorridor = () => {
@@ -808,6 +808,30 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
       const dstMarker = L.marker([destinationPoint.lat, destinationPoint.lng], { icon: dstIcon })
         .bindTooltip(`<b>Destination (B):</b> ${destinationPoint.name}`, { permanent: false, sticky: true });
       routeMarkersLayer.addLayer(dstMarker);
+    }
+
+    // Continuous Road Backbone (Visible Driving Alignment Ribbon)
+    const fullRouteCoords: [number, number][] = [];
+    routeSegments.forEach((s) => {
+      fullRouteCoords.push([s.start_lat, s.start_lng]);
+    });
+    if (routeSegments.length > 0) {
+      const last = routeSegments[routeSegments.length - 1];
+      fullRouteCoords.push([last.end_lat, last.end_lng]);
+
+      const backboneCasing = L.polyline(fullRouteCoords, {
+        color: isSat ? '#000000' : '#0F172A',
+        weight: 8,
+        opacity: 0.85
+      });
+      routeFoundationLayer.addLayer(backboneCasing);
+
+      const backboneCore = L.polyline(fullRouteCoords, {
+        color: '#2563EB',
+        weight: 5,
+        opacity: 0.95
+      });
+      routeFoundationLayer.addLayer(backboneCore);
     }
 
     // C. Render Sequential 100-Metre Segments Colored by Condition

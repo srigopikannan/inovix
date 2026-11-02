@@ -14,6 +14,7 @@ import type {
 } from '../types';
 import { LeafletMap } from '../components/LeafletMap';
 import { StreetViewPanoramaViewer } from '../components/StreetViewPanoramaViewer';
+import { resolveLocationClient } from '../services/routingClient';
 import {
   Search,
   MapPin,
@@ -151,6 +152,7 @@ export const ExploreRoadsPage: React.FC<ExploreRoadsPageProps> = ({
   const [selectedRouteSegment, setSelectedRouteSegment] = useState<RouteSegment100m | null>(null);
   const [selectedDefect, setSelectedDefect] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
+  const [routeError, setRouteError] = useState<string | null>(null);
 
   // UI Panels
   const [isSearchCardOpen, setIsSearchCardOpen] = useState(true);
@@ -234,13 +236,31 @@ export const ExploreRoadsPage: React.FC<ExploreRoadsPageProps> = ({
     startKm: number = rangeStartKm,
     lenKm: number = rangeLengthKm
   ) => {
-    if (!sourcePoint || !destPoint) return;
+    setRouteError(null);
+    let resolvedSource = sourcePoint;
+    let resolvedDest = destPoint;
+
+    // Auto-resolve typed input if point wasn't clicked from dropdown
+    if (!resolvedSource && sourceSearch.trim()) {
+      resolvedSource = await resolveLocationClient(sourceSearch.trim());
+      if (resolvedSource) setSourcePoint(resolvedSource);
+    }
+    if (!resolvedDest && destSearch.trim()) {
+      resolvedDest = await resolveLocationClient(destSearch.trim());
+      if (resolvedDest) setDestPoint(resolvedDest);
+    }
+
+    if (!resolvedSource || !resolvedDest) {
+      setRouteError('Please enter a valid starting location and destination in Tamil Nadu (e.g. Tiruppur, Pollachi, Coimbatore).');
+      return;
+    }
+
     try {
       setLoading(true);
       setShowMissingImageryNotice(false);
       setSelectedDefect(null);
 
-      const res = await api.calculateRouteAndInspect(sourcePoint, destPoint, undefined, routeIdx, startKm, lenKm);
+      const res = await api.calculateRouteAndInspect(resolvedSource, resolvedDest, undefined, routeIdx, startKm, lenKm);
       setRouteSegments(res.segments);
       setRangeSegments(res.range_segments || res.segments);
       setRangeInfo(res.range_info || null);
@@ -271,8 +291,9 @@ export const ExploreRoadsPage: React.FC<ExploreRoadsPageProps> = ({
           setSelectedRouteSegment(res.segments[0]);
         }
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Inspection failed:', err);
+      setRouteError(err?.message || 'Failed to inspect route corridor. Please check connection and try again.');
     } finally {
       setLoading(false);
     }
@@ -574,7 +595,7 @@ export const ExploreRoadsPage: React.FC<ExploreRoadsPageProps> = ({
         <div className="w-full relative">
           <LeafletMap
             roads={roads}
-            selectedRoad={roadDetails || undefined}
+            selectedRoad={undefined}
             accidents={accidents}
             blackspots={blackspots}
             defects={defects}
@@ -774,12 +795,29 @@ export const ExploreRoadsPage: React.FC<ExploreRoadsPageProps> = ({
                 {/* 3. Primary "INSPECT THIS ROUTE" Button */}
                 <button
                   onClick={() => handleRunInspection(0)}
-                  disabled={loading || !sourcePoint || !destPoint}
+                  disabled={loading || (!sourcePoint && !sourceSearch.trim()) || (!destPoint && !destSearch.trim())}
                   className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white rounded-xl font-extrabold text-xs tracking-wide transition shadow-md flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50"
                 >
                   <Search className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
                   <span>{loading ? 'Analyzing Route Telemetry...' : 'INSPECT THIS ROUTE'}</span>
                 </button>
+
+                {/* Error Banner */}
+                {routeError && (
+                  <div className="p-2.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-start space-x-2">
+                    <AlertTriangle className="w-4 h-4 shrink-0 text-red-600 mt-0.5" />
+                    <div className="flex-1">
+                      <div className="font-bold">Inspection Notice</div>
+                      <div className="text-[11px] leading-tight text-red-600 mt-0.5">{routeError}</div>
+                      <button
+                        onClick={() => handleRunInspection(0)}
+                        className="mt-1 text-[11px] font-bold text-red-800 underline hover:no-underline cursor-pointer"
+                      >
+                        Retry Inspection
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -790,9 +828,11 @@ export const ExploreRoadsPage: React.FC<ExploreRoadsPageProps> = ({
           <div className="bg-white/95 backdrop-blur-md rounded-2xl p-3 border border-slate-200 shadow-lg space-y-1 text-xs">
             <div className="flex items-center justify-between space-x-2">
               <div className="flex items-center space-x-1.5">
-                <span className={`w-2.5 h-2.5 rounded-full ${gpsFeedActive ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
+                <span className={`w-2.5 h-2.5 rounded-full ${routeSummary ? 'bg-blue-600 animate-pulse' : (gpsFeedActive ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400')}`} />
                 <span className="font-bold text-slate-800">
-                  {gpsFeedActive ? 'Live Device GPS Active' : 'Static Corridor Geometry'}
+                  {routeSummary
+                    ? `Route Active • ${routeSummary.total_distance_km} km`
+                    : (gpsFeedActive ? 'Live Device GPS Active' : 'Live Route Corridor')}
                 </span>
               </div>
               <button
@@ -807,9 +847,11 @@ export const ExploreRoadsPage: React.FC<ExploreRoadsPageProps> = ({
               </button>
             </div>
             <p className="text-[10px] text-slate-500 leading-tight">
-              {gpsFeedActive
-                ? `Authorized GPS feed: ${userLocation?.lat.toFixed(5)}, ${userLocation?.lng.toFixed(5)}`
-                : 'Displaying verified highway alignment and LiDAR telemetry. Static navigation mode.'}
+              {routeSummary
+                ? `${routeSummary.total_segments} 100m segments analyzed • ${routeSummary.overall_condition.replace(/_/g, ' ')} condition`
+                : (gpsFeedActive
+                    ? `Authorized GPS feed: ${userLocation?.lat.toFixed(5)}, ${userLocation?.lng.toFixed(5)}`
+                    : 'Displaying verified highway alignment and LiDAR telemetry. Static navigation mode.')}
             </p>
           </div>
         </div>
