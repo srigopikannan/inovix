@@ -13,6 +13,7 @@ import type {
 import {
   calculateRouteAndInspectClient,
   searchLocationsClient,
+  generateClientRouteReport,
   CURATED_TN_LOCATIONS
 } from './routingClient';
 
@@ -420,13 +421,22 @@ export const api = {
     segments: any[];
     summary_stats: any;
   }): Promise<{ download_url: string; format: string }> {
-    const res = await fetch(`${API_BASE}/routing/report`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) throw new Error('Failed to generate destination inspection report');
-    return res.json();
+    try {
+      const res = await fetch(`${API_BASE}/routing/report`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) {
+        const ct = res.headers.get('content-type') || '';
+        if (ct.includes('application/json')) {
+          return await res.json();
+        }
+      }
+    } catch (err) {
+      console.warn('Backend report generator unavailable, falling back to client-side report generator:', err);
+    }
+    return generateClientRouteReport(payload);
   },
 
   // ROADGUARD Live Road View

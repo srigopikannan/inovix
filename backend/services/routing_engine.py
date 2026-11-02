@@ -734,18 +734,19 @@ class RoutingEngine:
         elements.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor("#2563EB"), spaceAfter=10))
 
         # 2. Route Profile Table
+        inspected_km_val = summary_stats.get("inspected_km") or route_meta.get("range_length_km") or route_meta.get("distance_km", 0)
         route_info_data = [
             [
                 Paragraph(f"<b>Origin:</b> {source_name}", body_style),
                 Paragraph(f"<b>Destination:</b> {destination_name}", body_style)
             ],
             [
-                Paragraph(f"<b>Route Distance:</b> {route_meta.get('distance_km', 0)} km", body_style),
-                Paragraph(f"<b>Estimated Travel Time:</b> {route_meta.get('duration_min', 0)} mins", body_style)
+                Paragraph(f"<b>Total Corridor Distance:</b> {route_meta.get('distance_km', 0)} km", body_style),
+                Paragraph(f"<b>Inspection Stretch Scope:</b> {inspected_km_val} km road stretch", body_style)
             ],
             [
                 Paragraph(f"<b>Primary Highway:</b> {route_meta.get('primary_road_name', 'National Highway')}", body_style),
-                Paragraph(f"<b>Routing Provider:</b> {route_meta.get('provider', 'OSRM')}", body_style)
+                Paragraph(f"<b>Estimated Travel Time:</b> {route_meta.get('duration_min', 0)} mins", body_style)
             ]
         ]
         info_table = Table(route_info_data, colWidths=[270, 270])
