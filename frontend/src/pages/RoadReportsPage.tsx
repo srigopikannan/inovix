@@ -746,6 +746,9 @@ export const RoadReportsPage: React.FC<RoadReportsPageProps> = ({
           <LeafletMap
             roads={roads}
             selectedRoad={undefined}
+            accidents={[]}
+            blackspots={[]}
+            defects={[]}
             routeSegments={activeSegments}
             selectedRouteSegment={selectedSegment}
             onSelectRouteSegment={(seg) => setSelectedSegment(seg)}

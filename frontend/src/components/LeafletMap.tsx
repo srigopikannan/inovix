@@ -57,11 +57,11 @@ interface LeafletMapProps {
 }
 
 export const LeafletMap: React.FC<LeafletMapProps> = ({
-  roads,
+  roads = [],
   selectedRoad,
-  accidents,
-  blackspots,
-  defects,
+  accidents = [],
+  blackspots = [],
+  defects = [],
   onSelectSegment,
   selectedSegment,
   height = '620px',
