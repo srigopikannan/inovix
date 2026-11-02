@@ -1,0 +1,271 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+@import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
+
+@theme {
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
+  --color-brand-bg: #F5F8FC;
+  --color-brand-surface: #FFFFFF;
+  --color-brand-blue: #2563EB;
+  --color-brand-cyan: #06B6D4;
+  --color-brand-navy: #172B4D;
+  --color-brand-secondary: #64748B;
+  --color-brand-border: #E2E8F0;
+  --color-brand-critical: #DC2626;
+  --color-brand-warning: #F59E0B;
+  --color-brand-success: #16A34A;
+}
+
+@layer base {
+  :root {
+    --font-inter: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --font-mono: 'IBM Plex Mono', monospace;
+  }
+
+  body {
+    font-family: var(--font-inter);
+    background-color: #F5F8FC;
+    color: #172B4D;
+    overflow-x: hidden;
+    letter-spacing: -0.011em;
+  }
+
+  code, pre, .font-mono {
+    font-family: var(--font-mono);
+    letter-spacing: -0.02em;
+  }
+}
+
+/* Custom scrollbars for clean light enterprise UI */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #F1F5F9;
+}
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}
+
+/* Clean Leaflet Map styling for light GIS enterprise interface */
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+  background: #F1F5F9;
+  font-family: var(--font-inter);
+  touch-action: none !important;
+  cursor: grab;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.leaflet-container:focus {
+  outline: none;
+}
+
+.leaflet-container:active,
+.leaflet-container.leaflet-drag-target,
+.leaflet-dragging .leaflet-container {
+  cursor: grabbing !important;
+}
+
+.leaflet-grab {
+  cursor: grab !important;
+}
+
+.leaflet-dragging .leaflet-grab,
+.leaflet-dragging .leaflet-grab .leaflet-interactive,
+.leaflet-dragging .leaflet-marker-draggable {
+  cursor: grabbing !important;
+}
+.leaflet-popup-content-wrapper {
+  background: #FFFFFF !important;
+  color: #172B4D !important;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  box-shadow: 0 12px 30px -5px rgba(23, 43, 77, 0.12);
+}
+.leaflet-popup-tip {
+  background: #FFFFFF !important;
+}
+
+/* ========================================================
+   FUTURISTIC AI MOTION GRAPHICS & GEOSPATIAL ANIMATIONS
+   ======================================================== */
+
+@keyframes laserScan {
+  0% {
+    top: 0%;
+    opacity: 0.85;
+  }
+  50% {
+    top: 96%;
+    opacity: 1;
+  }
+  100% {
+    top: 0%;
+    opacity: 0.85;
+  }
+}
+
+.animate-laser-scan {
+  animation: laserScan 2.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes radarSweep {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-radar-sweep {
+  animation: radarSweep 4s linear infinite;
+}
+
+@keyframes pulseHalo {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.5);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 14px rgba(37, 99, 235, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(37, 99, 235, 0);
+  }
+}
+
+.animate-pulse-halo {
+  animation: pulseHalo 2s infinite;
+}
+
+@keyframes pulseGlowCyan {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(6, 182, 212, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 22px rgba(6, 182, 212, 0.7);
+  }
+}
+
+.animate-glow-cyan {
+  animation: pulseGlowCyan 2.5s ease-in-out infinite;
+}
+
+@keyframes floatGentle {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+.animate-float {
+  animation: floatGentle 4s ease-in-out infinite;
+}
+
+@keyframes dashFlow {
+  to {
+    stroke-dashoffset: -40;
+  }
+}
+
+.animate-dash-flow {
+  animation: dashFlow 1.8s linear infinite;
+}
+
+/* High-tech geospatial grid background */
+.cyber-grid-light {
+  background-size: 32px 32px;
+  background-image: 
+    linear-gradient(to right, rgba(226, 232, 240, 0.6) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(226, 232, 240, 0.6) 1px, transparent 1px);
+}
+
+.cyber-grid-subtle {
+  background-size: 20px 20px;
+  background-image: 
+    linear-gradient(to right, rgba(226, 232, 240, 0.35) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(226, 232, 240, 0.35) 1px, transparent 1px);
+}
+
+/* Glassmorphic surfaces */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(226, 232, 240, 0.85);
+}
+
+.glass-panel-elevated {
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  box-shadow: 0 10px 30px -8px rgba(23, 43, 77, 0.08), 0 4px 6px -2px rgba(23, 43, 77, 0.02);
+}
+
+/* Computer vision targeting brackets */
+.cv-reticle-corner-tl {
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  width: 10px;
+  height: 10px;
+  border-top: 2px solid #06B6D4;
+  border-left: 2px solid #06B6D4;
+}
+
+.cv-reticle-corner-tr {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 10px;
+  height: 10px;
+  border-top: 2px solid #06B6D4;
+  border-right: 2px solid #06B6D4;
+}
+
+.cv-reticle-corner-bl {
+  position: absolute;
+  bottom: -2px;
+  left: -2px;
+  width: 10px;
+  height: 10px;
+  border-bottom: 2px solid #06B6D4;
+  border-left: 2px solid #06B6D4;
+}
+
+.cv-reticle-corner-br {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 10px;
+  height: 10px;
+  border-bottom: 2px solid #06B6D4;
+  border-right: 2px solid #06B6D4;
+}
+
+/* Accessibility: respect user preference for reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
