@@ -18,18 +18,103 @@ import {
 
 const API_BASE = '/api';
 
+const FALLBACK_ROADS: Road[] = [
+  {
+    id: 1,
+    code: 'SH-174',
+    name: 'SH-174 / NH-83 Tiruppur - Palladam - Pollachi Corridor',
+    highway_class: 'State Highway',
+    length_km: 65.8,
+    start_lat: 11.1085,
+    start_lng: 77.3411,
+    end_lat: 10.6609,
+    end_lng: 77.0048,
+    surface_type: 'Asphalt Concrete',
+    lane_count: 4,
+    speed_limit_kph: 80,
+    segment_count: 660,
+    average_health_score: 72.4,
+    defect_count: 8,
+    accident_count: 14,
+    blackspot_count: 3,
+    start_point: 'Tiruppur (Old Bus Stand / Kumaran Road)',
+    end_point: 'Pollachi (Central Bus Stand / Coimbatore Road)'
+  },
+  {
+    id: 2,
+    code: 'NH-44',
+    name: 'NH-44 Cyber City - Rajiv Chowk Express Corridor',
+    highway_class: 'National Highway',
+    length_km: 10.0,
+    start_lat: 28.4950,
+    start_lng: 77.0890,
+    end_lat: 28.4550,
+    end_lng: 77.0630,
+    surface_type: 'Bituminous Concrete',
+    lane_count: 8,
+    speed_limit_kph: 90,
+    segment_count: 100,
+    average_health_score: 78.5,
+    defect_count: 5,
+    accident_count: 24,
+    blackspot_count: 2,
+    start_point: 'Cyber City Toll Plaza',
+    end_point: 'Rajiv Chowk Flyover'
+  },
+  {
+    id: 3,
+    code: 'NH-544',
+    name: 'NH-544 Coimbatore - Salem Express Highway',
+    highway_class: 'National Highway',
+    length_km: 165.0,
+    start_lat: 11.0168,
+    start_lng: 76.9558,
+    end_lat: 11.6643,
+    end_lng: 78.1460,
+    surface_type: 'Rigid Concrete',
+    lane_count: 6,
+    speed_limit_kph: 100,
+    segment_count: 1650,
+    average_health_score: 84.2,
+    defect_count: 12,
+    accident_count: 18,
+    blackspot_count: 4,
+    start_point: 'Coimbatore (Gandhipuram)',
+    end_point: 'Salem (New Bus Stand)'
+  }
+];
+
 export const api = {
   // Roads
   async getRoads(): Promise<Road[]> {
-    const res = await fetch(`${API_BASE}/roads`);
-    if (!res.ok) throw new Error('Failed to fetch roads');
-    return res.json();
+    try {
+      const res = await fetch(`${API_BASE}/roads`);
+      if (res.ok) {
+        const ct = res.headers.get('content-type') || '';
+        if (ct.includes('application/json')) {
+          return await res.json();
+        }
+      }
+    } catch {
+      // Offline / Vercel fallback
+    }
+    return FALLBACK_ROADS;
   },
 
   async getRoad(id: number): Promise<Road & { segments: RoadSegment[] }> {
-    const res = await fetch(`${API_BASE}/roads/${id}`);
-    if (!res.ok) throw new Error('Failed to fetch road details');
-    return res.json();
+    try {
+      const res = await fetch(`${API_BASE}/roads/${id}`);
+      if (res.ok) {
+        const ct = res.headers.get('content-type') || '';
+        if (ct.includes('application/json')) {
+          return await res.json();
+        }
+      }
+    } catch {
+      // Offline / Vercel fallback
+    }
+    const road = FALLBACK_ROADS.find((r) => r.id === id) || FALLBACK_ROADS[0];
+    return { ...road, segments: [] };
   },
 
   async createRoad(data: any): Promise<{ road_id: number; segments_created: number }> {
@@ -44,12 +129,21 @@ export const api = {
 
   // Accidents & Black Spots
   async getAccidents(roadId?: number, severity?: string): Promise<Accident[]> {
-    const params = new URLSearchParams();
-    if (roadId) params.append('road_id', roadId.toString());
-    if (severity) params.append('severity', severity);
-    const res = await fetch(`${API_BASE}/accidents?${params.toString()}`);
-    if (!res.ok) throw new Error('Failed to fetch accidents');
-    return res.json();
+    try {
+      const params = new URLSearchParams();
+      if (roadId) params.append('road_id', roadId.toString());
+      if (severity) params.append('severity', severity);
+      const res = await fetch(`${API_BASE}/accidents?${params.toString()}`);
+      if (res.ok) {
+        const ct = res.headers.get('content-type') || '';
+        if (ct.includes('application/json')) {
+          return await res.json();
+        }
+      }
+    } catch {
+      // Offline / Vercel fallback
+    }
+    return [];
   },
 
   async createAccident(data: any): Promise<{ id: number }> {
@@ -63,11 +157,20 @@ export const api = {
   },
 
   async getBlackSpots(roadId?: number): Promise<BlackSpot[]> {
-    const params = new URLSearchParams();
-    if (roadId) params.append('road_id', roadId.toString());
-    const res = await fetch(`${API_BASE}/accidents/blackspots?${params.toString()}`);
-    if (!res.ok) throw new Error('Failed to fetch black spots');
-    return res.json();
+    try {
+      const params = new URLSearchParams();
+      if (roadId) params.append('road_id', roadId.toString());
+      const res = await fetch(`${API_BASE}/accidents/blackspots?${params.toString()}`);
+      if (res.ok) {
+        const ct = res.headers.get('content-type') || '';
+        if (ct.includes('application/json')) {
+          return await res.json();
+        }
+      }
+    } catch {
+      // Offline / Vercel fallback
+    }
+    return [];
   },
 
   async recalculateBlackSpots(): Promise<{ black_spots_identified: number }> {
@@ -80,12 +183,21 @@ export const api = {
 
   // Defects & Computer Vision
   async getDefects(roadId?: number, segmentId?: number): Promise<DefectDetection[]> {
-    const params = new URLSearchParams();
-    if (roadId) params.append('road_id', roadId.toString());
-    if (segmentId) params.append('segment_id', segmentId.toString());
-    const res = await fetch(`${API_BASE}/defects?${params.toString()}`);
-    if (!res.ok) throw new Error('Failed to fetch defects');
-    return res.json();
+    try {
+      const params = new URLSearchParams();
+      if (roadId) params.append('road_id', roadId.toString());
+      if (segmentId) params.append('segment_id', segmentId.toString());
+      const res = await fetch(`${API_BASE}/defects?${params.toString()}`);
+      if (res.ok) {
+        const ct = res.headers.get('content-type') || '';
+        if (ct.includes('application/json')) {
+          return await res.json();
+        }
+      }
+    } catch {
+      // Offline / Vercel fallback
+    }
+    return [];
   },
 
   async detectDefects(formData: FormData): Promise<{

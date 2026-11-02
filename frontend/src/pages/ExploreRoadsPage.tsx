@@ -29,6 +29,7 @@ import {
   Sparkles,
   RotateCcw,
   ExternalLink,
+  ChevronLeft,
   ChevronRight,
   ChevronDown,
   ChevronUp,
