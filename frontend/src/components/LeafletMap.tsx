@@ -845,12 +845,13 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
       );
       routeFoundationLayer.addLayer(underlayLine);
 
+      const isSelectedRange = seg.in_selected_range !== false;
       const segmentPoly = L.polyline(
         [[seg.start_lat, seg.start_lng], [seg.end_lat, seg.end_lng]],
         {
           color: segColor,
-          weight: 4.5,
-          opacity,
+          weight: isSelectedRange ? 6.0 : 3.5,
+          opacity: isSelectedRange ? opacity : 0.45,
           dashArray: isDashed ? '4, 4' : undefined
         }
       );
@@ -942,17 +943,35 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
             ? new Date(d.detected_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })
             : '2026-10-31 15:00 IST';
 
+          const isPothole = dType.toLowerCase().includes('pothole');
+          const isCrack = dType.toLowerCase().includes('crack');
+          const borderRadius = isPothole ? '50%' : isCrack ? '5px' : '8px';
+
           const defectIcon = L.divIcon({
             className: 'route-defect-icon-pin',
             html: `
               <div style="position: relative; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: pointer;">
-                <span style="position: absolute; width: 100%; height: 100%; border-radius: 50%; background-color: ${markerColor}; opacity: 0.35; animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;"></span>
-                <div style="width: 26px; height: 26px; border-radius: 50%; background-color: ${markerColor}; border: 2.5px solid #FFFFFF; box-shadow: 0 3px 8px rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center;">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="12" cy="12" r="9"/>
-                    <line x1="12" y1="8" x2="12" y2="12"/>
-                    <line x1="12" y1="16" x2="12.01" y2="16"/>
-                  </svg>
+                <span style="position: absolute; width: 100%; height: 100%; border-radius: ${borderRadius}; background-color: ${markerColor}; opacity: 0.35; animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;"></span>
+                <div style="width: 26px; height: 26px; border-radius: ${borderRadius}; background-color: ${markerColor}; border: 2.5px solid #FFFFFF; box-shadow: 0 3px 8px rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center;">
+                  ${isPothole ? `
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                      <circle cx="12" cy="12" r="9"/>
+                      <line x1="12" y1="3" x2="12" y2="7"/>
+                      <line x1="12" y1="17" x2="12" y2="21"/>
+                      <line x1="3" y1="12" x2="7" y2="12"/>
+                      <line x1="17" y1="12" x2="21" y2="12"/>
+                    </svg>
+                  ` : isCrack ? `
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                      <polyline points="4 14 10 7 14 17 20 10"/>
+                    </svg>
+                  ` : `
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                      <circle cx="12" cy="12" r="9"/>
+                      <line x1="12" y1="8" x2="12" y2="12"/>
+                      <line x1="12" y1="16" x2="12.01" y2="16"/>
+                    </svg>
+                  `}
                 </div>
               </div>
             `,

@@ -19,6 +19,8 @@ class RouteRequest(BaseModel):
     destination: LocationPoint
     road_name: Optional[str] = "Tamil Nadu Road Network"
     route_index: Optional[int] = 0
+    range_start_km: Optional[float] = 0.0
+    range_length_km: Optional[float] = 10.0
 
 class ReportRequest(BaseModel):
     source_name: str
@@ -167,12 +169,79 @@ def calculate_route_and_inspect(payload: RouteRequest, db: Session = Depends(get
         )
     }
 
+    # 4. Custom Road Inspection Range (Default 10 km, Max 20 km)
+    total_dist_km = route_meta["distance_km"]
+    req_start_km = max(0.0, float(payload.range_start_km or 0.0))
+    raw_len = float(payload.range_length_km or 10.0)
+    clamped_len_km = max(1.0, min(20.0, raw_len))
+
+    # Ensure start does not exceed route end
+    range_start_km = min(req_start_km, max(0.0, total_dist_km - 0.1))
+    range_end_km = min(total_dist_km, range_start_km + clamped_len_km)
+
+    range_start_m = range_start_km * 1000.0
+    range_end_m = range_end_km * 1000.0
+
+    range_segments = []
+    range_potholes = 0
+    range_cracks = 0
+    range_critical = 0
+    range_poor = 0
+    range_moderate = 0
+    range_good = 0
+    range_inspected = 0
+
+    for seg in segments:
+        in_range = (seg["chainage_start_m"] < range_end_m) and (seg["chainage_end_m"] > range_start_m)
+        seg["in_selected_range"] = in_range
+        if in_range:
+            range_segments.append(seg)
+            if seg["inspection_status"] == "INSPECTED":
+                range_inspected += 1
+                cond = seg.get("road_condition")
+                if cond == "CRITICAL":
+                    range_critical += 1
+                elif cond == "POOR":
+                    range_poor += 1
+                elif cond == "MODERATE":
+                    range_moderate += 1
+                elif cond == "GOOD":
+                    range_good += 1
+                for d in seg.get("defects", []):
+                    dtype = d.get("defect_type", "").lower()
+                    if "pothole" in dtype:
+                        range_potholes += 1
+                    elif "crack" in dtype:
+                        range_cracks += 1
+
+    range_info = {
+        "start_km": round(range_start_km, 2),
+        "end_km": round(range_end_km, 2),
+        "length_km": round(range_end_km - range_start_km, 2),
+        "total_route_km": total_dist_km,
+        "has_prev": range_start_km > 0.05,
+        "has_next": range_end_km < (total_dist_km - 0.05),
+        "prev_start_km": max(0.0, round(range_start_km - clamped_len_km, 2)),
+        "next_start_km": min(total_dist_km, round(range_end_km, 2)),
+        "range_segments_count": len(range_segments),
+        "pothole_count": range_potholes,
+        "crack_count": range_cracks,
+        "critical_count": range_critical,
+        "poor_count": range_poor,
+        "moderate_count": range_moderate,
+        "good_count": range_good,
+        "inspected_count": range_inspected,
+        "uninspected_count": len(range_segments) - range_inspected
+    }
+
     return {
         "status": "SUCCESS",
         "route": route_meta,
         "segments": segments,
         "summary": summary_stats,
-        "alternatives": route_meta.get("alternative_routes", [])
+        "alternatives": route_meta.get("alternative_routes", []),
+        "range_info": range_info,
+        "range_segments": range_segments
     }
 
 @router.post("/report")

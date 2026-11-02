@@ -76,24 +76,36 @@ async def detect_defects_api(
     if file and file.filename:
         # Security: validate file extension
         ext = Path(file.filename).suffix.lower()
-        allowed_extensions = {".jpg", ".jpeg", ".png", ".webp", ".bmp"}
+        allowed_extensions = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".mp4", ".mov", ".avi"}
         if ext not in allowed_extensions:
             raise HTTPException(
                 status_code=400,
                 detail=f"Unsupported file format '{ext}'. Allowed extensions: {', '.join(sorted(allowed_extensions))}"
             )
 
-        # Security: validate file size (25 MB max)
-        MAX_UPLOAD_SIZE = 25 * 1024 * 1024
+        # Security: validate file size (50 MB max for dashcam snippets / images)
+        MAX_UPLOAD_SIZE = 50 * 1024 * 1024
         contents = await file.read()
         if len(contents) > MAX_UPLOAD_SIZE:
-            raise HTTPException(status_code=413, detail="File size exceeds maximum permitted limit (25 MB).")
+            raise HTTPException(status_code=413, detail="File size exceeds maximum permitted limit (50 MB).")
 
         filename = f"upload_{uuid.uuid4().hex[:8]}{ext}"
         saved_path = UPLOADS_DIR / filename
         with open(saved_path, "wb") as buffer:
             buffer.write(contents)
         image_url = f"/uploads/{filename}"
+
+        # If video file, extract representative keyframe for CV inference
+        if ext in {".mp4", ".mov", ".avi"}:
+            cap = cv2.VideoCapture(str(saved_path))
+            success, frame = cap.read()
+            if success and frame is not None:
+                frame_filename = f"frame_{uuid.uuid4().hex[:8]}.jpg"
+                frame_path = UPLOADS_DIR / frame_filename
+                cv2.imwrite(str(frame_path), frame)
+                saved_path = frame_path
+                image_url = f"/uploads/{frame_filename}"
+            cap.release()
     elif sample_image_url:
         # Relocate relative path
         fname = Path(sample_image_url).name
@@ -119,11 +131,11 @@ async def detect_defects_api(
     # Save detections to database
     saved_defects = []
     for det in detections:
-        # Measurement computation
-        meas = MeasurementEngine.compute_dimensions(
+        meas = det.get("measurements") or MeasurementEngine.compute_dimensions(
             pixel_length=det["pixel_length"],
             pixel_width=det["pixel_width"],
-            contour_area_px=det["contour_area_px"]
+            contour_area_px=det["contour_area_px"],
+            defect_type=det["defect_type"]
         )
 
         db_defect = DefectDetection(
@@ -141,10 +153,10 @@ async def detect_defects_api(
             pixel_length=det["pixel_length"],
             pixel_width=det["pixel_width"],
             estimated_length_mm=meas["metric_dimensions"]["length_mm"],
-            estimated_width_mm=meas["metric_dimensions"]["width_mm"],
+            estimated_width_mm=meas["metric_dimensions"]["breadth_mm"] if "breadth_mm" in meas["metric_dimensions"] else meas["metric_dimensions"]["width_mm"],
             estimated_area_cm2=meas["metric_dimensions"]["estimated_area_cm2"],
-            measurement_calibrated=meas["calibration"]["is_calibrated"],
-            measurement_notes=meas["calibration"]["metrology_notice"],
+            measurement_calibrated=meas["is_calibrated"],
+            measurement_notes=meas["metrology_notice"],
             status="UNRESOLVED"
         )
         db.add(db_defect)

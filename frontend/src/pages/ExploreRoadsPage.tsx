@@ -9,9 +9,11 @@ import type {
   DefectDetection,
   LocationSuggestion,
   RouteSegment100m,
-  RouteInspectionSummary
+  RouteInspectionSummary,
+  RouteRangeInfo
 } from '../types';
 import { LeafletMap } from '../components/LeafletMap';
+import { StreetViewPanoramaViewer } from '../components/StreetViewPanoramaViewer';
 import {
   Search,
   MapPin,
@@ -130,8 +132,12 @@ export const ExploreRoadsPage: React.FC<ExploreRoadsPageProps> = ({
   const [viewMode, setViewMode] = useState<'standard' | 'satellite' | 'street'>('standard');
   const [basemap, setBasemap] = useState<'street' | 'satellite'>('street');
 
-  // Inspection Results & Alternatives
+  // Inspection Results & Custom Inspection Range
   const [routeSegments, setRouteSegments] = useState<RouteSegment100m[]>([]);
+  const [rangeSegments, setRangeSegments] = useState<RouteSegment100m[]>([]);
+  const [rangeInfo, setRangeInfo] = useState<RouteRangeInfo | null>(null);
+  const [rangeStartKm, setRangeStartKm] = useState<number>(0.0);
+  const [rangeLengthKm, setRangeLengthKm] = useState<number>(10.0);
   const [routeSummary, setRouteSummary] = useState<RouteInspectionSummary | null>(null);
   const [availableAlternatives, setAvailableAlternatives] = useState<Array<{
     route_index: number;
@@ -220,18 +226,26 @@ export const ExploreRoadsPage: React.FC<ExploreRoadsPageProps> = ({
 
   // Initial Route Load (Tiruppur to Pollachi)
   useEffect(() => {
-    handleRunInspection(0);
+    handleRunInspection(0, 0.0, 10.0);
   }, []);
 
-  const handleRunInspection = async (routeIdx: number = 0) => {
+  const handleRunInspection = async (
+    routeIdx: number = 0,
+    startKm: number = rangeStartKm,
+    lenKm: number = rangeLengthKm
+  ) => {
     if (!sourcePoint || !destPoint) return;
     try {
       setLoading(true);
       setShowMissingImageryNotice(false);
       setSelectedDefect(null);
 
-      const res = await api.calculateRouteAndInspect(sourcePoint, destPoint, undefined, routeIdx);
+      const res = await api.calculateRouteAndInspect(sourcePoint, destPoint, undefined, routeIdx, startKm, lenKm);
       setRouteSegments(res.segments);
+      setRangeSegments(res.range_segments || res.segments);
+      setRangeInfo(res.range_info || null);
+      setRangeStartKm(res.range_info?.start_km ?? startKm);
+      setRangeLengthKm(res.range_info?.length_km ?? lenKm);
       setRouteSummary(res.summary);
       setAvailableAlternatives(res.alternatives || []);
       setSelectedAlternativeIndex(routeIdx);
@@ -239,7 +253,9 @@ export const ExploreRoadsPage: React.FC<ExploreRoadsPageProps> = ({
       // Check if any verified imagery exists
       const hasInspectedSegments = res.segments.some((s) => s.inspection_status === 'INSPECTED');
       if (hasInspectedSegments) {
-        const firstInspected = res.segments.find((s) => s.inspection_status === 'INSPECTED' && s.defects.length > 0)
+        const activeWindow = res.range_segments || res.segments;
+        const firstInspected = activeWindow.find((s) => s.inspection_status === 'INSPECTED' && s.defects.length > 0)
+          || activeWindow.find((s) => s.inspection_status === 'INSPECTED')
           || res.segments.find((s) => s.inspection_status === 'INSPECTED');
         if (firstInspected) {
           setSelectedRouteSegment(firstInspected);
@@ -262,6 +278,29 @@ export const ExploreRoadsPage: React.FC<ExploreRoadsPageProps> = ({
     }
   };
 
+  const handleMoveRange = (direction: 'prev' | 'next') => {
+    if (!rangeInfo || !routeSummary) return;
+    let nextStart = rangeStartKm;
+    if (direction === 'prev') {
+      nextStart = Math.max(0.0, rangeStartKm - rangeLengthKm);
+    } else {
+      nextStart = Math.min(routeSummary.total_distance_km - 0.1, rangeStartKm + rangeLengthKm);
+    }
+    setRangeStartKm(nextStart);
+    handleRunInspection(selectedAlternativeIndex, nextStart, rangeLengthKm);
+  };
+
+  const handleChangeRangeLength = (newLen: number) => {
+    const clamped = Math.max(1.0, Math.min(20.0, newLen));
+    setRangeLengthKm(clamped);
+    handleRunInspection(selectedAlternativeIndex, rangeStartKm, clamped);
+  };
+
+  const handleSliderRangeChange = (newStart: number) => {
+    setRangeStartKm(newStart);
+    handleRunInspection(selectedAlternativeIndex, newStart, rangeLengthKm);
+  };
+
   const handleSwapRoute = () => {
     const tempP = sourcePoint;
     const tempT = sourceSearch;
@@ -280,11 +319,15 @@ export const ExploreRoadsPage: React.FC<ExploreRoadsPageProps> = ({
     setShowDestDropdown(false);
     setShowMissingImageryNotice(false);
     setSelectedDefect(null);
+    setRangeStartKm(0.0);
+    setRangeLengthKm(10.0);
 
     setLoading(true);
-    api.calculateRouteAndInspect(preset.source, preset.destination, preset.roadName, 0)
+    api.calculateRouteAndInspect(preset.source, preset.destination, preset.roadName, 0, 0.0, 10.0)
       .then((res) => {
         setRouteSegments(res.segments);
+        setRangeSegments(res.range_segments || res.segments);
+        setRangeInfo(res.range_info || null);
         setRouteSummary(res.summary);
         setAvailableAlternatives(res.alternatives || []);
         setSelectedAlternativeIndex(0);
@@ -425,35 +468,74 @@ export const ExploreRoadsPage: React.FC<ExploreRoadsPageProps> = ({
             </button>
           </div>
 
-          {/* Quick PDF Report Generator */}
+          {/* Reports & Sample Trigger Actions */}
           {routeSummary && (
-            <button
-              onClick={async () => {
-                try {
-                  const rep = await api.generateRouteReport({
-                    source_name: sourcePoint?.name || sourceSearch,
-                    destination_name: destPoint?.name || destSearch,
-                    format: 'pdf',
-                    route_meta: {
-                      distance_km: routeSummary.total_distance_km,
-                      duration_min: routeSummary.total_duration_min,
-                      primary_road_name: routeSegments[0]?.road_name || 'Highway Corridor'
-                    },
-                    segments: routeSegments,
-                    summary_stats: routeSummary
-                  });
-                  window.open(rep.download_url, '_blank');
-                } catch (e) {
-                  console.error(e);
-                  alert('Generating route inspection audit report...');
-                }
-              }}
-              className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold flex items-center space-x-1.5 transition shadow-xs cursor-pointer"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>Export MoRTH Audit</span>
-            </button>
+            <div className="flex items-center space-x-1.5">
+              <button
+                onClick={async () => {
+                  try {
+                    const rep = await api.generateRouteReport({
+                      source_name: sourcePoint?.name || sourceSearch,
+                      destination_name: destPoint?.name || destSearch,
+                      format: 'pdf',
+                      route_meta: {
+                        distance_km: routeSummary.total_distance_km,
+                        duration_min: routeSummary.total_duration_min,
+                        primary_road_name: routeSegments[0]?.road_name || 'Highway Corridor'
+                      },
+                      segments: routeSegments,
+                      summary_stats: routeSummary
+                    });
+                    window.open(rep.download_url, '_blank');
+                  } catch (e) {
+                    console.error(e);
+                    alert('Generating route inspection audit report...');
+                  }
+                }}
+                className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold flex items-center space-x-1.5 transition shadow-xs cursor-pointer"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Export PDF</span>
+              </button>
+
+              <button
+                onClick={async () => {
+                  try {
+                    const rep = await api.generateRouteReport({
+                      source_name: sourcePoint?.name || sourceSearch,
+                      destination_name: destPoint?.name || destSearch,
+                      format: 'csv',
+                      route_meta: {
+                        distance_km: routeSummary.total_distance_km,
+                        duration_min: routeSummary.total_duration_min,
+                        primary_road_name: routeSegments[0]?.road_name || 'Highway Corridor'
+                      },
+                      segments: routeSegments,
+                      summary_stats: routeSummary
+                    });
+                    window.open(rep.download_url, '_blank');
+                  } catch (e) {
+                    console.error(e);
+                    alert('Failed to generate CSV export.');
+                  }
+                }}
+                className="px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl font-bold flex items-center space-x-1.5 transition shadow-xs cursor-pointer"
+              >
+                <FileText className="w-3.5 h-3.5 text-blue-600" />
+                <span>Export CSV</span>
+              </button>
+            </div>
           )}
+
+          {/* Direct Sample Pothole NH-44 Benchmark Trigger */}
+          <button
+            onClick={() => navigate('/ai-inspection')}
+            id="btn-explore-sample-pothole"
+            className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl font-bold flex items-center space-x-1.5 transition cursor-pointer"
+          >
+            <Crosshair className="w-3.5 h-3.5" />
+            <span>Sample Pothole NH-44</span>
+          </button>
         </div>
       </div>
 
@@ -877,68 +959,36 @@ export const ExploreRoadsPage: React.FC<ExploreRoadsPageProps> = ({
 
         {/* STREET-LEVEL VIEW OVERLAY MODAL (When Street-Level View is Active) */}
         {viewMode === 'street' && (
-          <div className="absolute inset-0 z-[400] bg-slate-900/90 backdrop-blur-md flex flex-col items-center justify-center p-6 text-white text-center">
-            {selectedRouteSegment && selectedRouteSegment.defects.length > 0 ? (
-              <div className="max-w-2xl w-full bg-slate-950 p-6 rounded-3xl border border-slate-800 shadow-2xl space-y-4">
-                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                  <div className="text-left">
-                    <span className="text-[10px] font-mono text-cyan-400 uppercase font-bold">
-                      {selectedRouteSegment.segment_id} Optical Survey Frame
-                    </span>
-                    <h3 className="font-bold text-sm text-white">{selectedRouteSegment.road_name}</h3>
-                  </div>
-                  <button
-                    onClick={() => setViewMode('standard')}
-                    className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-xs rounded-xl font-bold cursor-pointer"
-                  >
-                    Return to Map
-                  </button>
-                </div>
-
-                <div className="relative rounded-2xl overflow-hidden border border-slate-700 aspect-video bg-black">
-                  <img
-                    src={selectedRouteSegment.defects[0].image_url}
-                    alt="Street Camera Frame"
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute top-3 left-3 bg-red-600/90 text-white text-[10px] font-bold px-2.5 py-1 rounded-md">
-                    AI DETECTED: {selectedRouteSegment.defects[0].defect_type} ({Math.round(selectedRouteSegment.defects[0].confidence * 100)}%)
-                  </div>
-                  <div className="absolute bottom-3 left-3 right-3 bg-black/60 backdrop-blur-xs p-2 rounded-xl text-left text-[11px] font-mono">
-                    <div>GPS: {selectedRouteSegment.start_lat}, {selectedRouteSegment.start_lng}</div>
-                    <div>IRI Roughness: {selectedRouteSegment.surface_roughness_iri} m/km &bull; Health: {selectedRouteSegment.health_score}/100</div>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="max-w-md bg-slate-950 p-6 rounded-3xl border border-slate-800 space-y-3">
-                <Camera className="w-10 h-10 text-slate-500 mx-auto" />
-                <h3 className="font-bold text-base text-white">Street-Level Imagery Not Available</h3>
-                <p className="text-xs text-slate-400">
-                  High-speed optical camera footage has not yet been indexed for this specific segment. Switch to Satellite View or Standard Map.
-                </p>
-                <div className="pt-2 flex justify-center space-x-2">
-                  <button
-                    onClick={() => {
-                      setViewMode('standard');
-                      setBasemap('street');
-                    }}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold cursor-pointer"
-                  >
-                    View Standard Map
-                  </button>
-                  <button
-                    onClick={() => {
-                      setViewMode('satellite');
-                      setBasemap('satellite');
-                    }}
-                    className="px-4 py-2 bg-slate-800 text-white rounded-xl text-xs font-bold cursor-pointer"
-                  >
-                    View Satellite Imagery
-                  </button>
-                </div>
-              </div>
-            )}
+          <div className="absolute inset-0 z-[400] bg-slate-950/95 backdrop-blur-md p-3 sm:p-5 flex items-center justify-center">
+            <div className="w-full h-full max-w-6xl">
+              <StreetViewPanoramaViewer
+                lat={
+                  selectedDefect?.latitude ??
+                  (selectedRouteSegment
+                    ? (selectedRouteSegment.start_lat + selectedRouteSegment.end_lat) / 2
+                    : (sourcePoint?.lat || 11.1085))
+                }
+                lng={
+                  selectedDefect?.longitude ??
+                  (selectedRouteSegment
+                    ? (selectedRouteSegment.start_lng + selectedRouteSegment.end_lng) / 2
+                    : (sourcePoint?.lng || 77.3411))
+                }
+                roadName={selectedRouteSegment?.road_name || 'Tamil Nadu Highway Corridor'}
+                segmentId={selectedRouteSegment?.segment_id}
+                surveyFrameUrl={selectedDefect?.image_url || selectedRouteSegment?.defects?.[0]?.image_url}
+                surveyDefects={selectedRouteSegment?.defects || []}
+                onClose={() => setViewMode('standard')}
+                onSwitchToSatellite={() => {
+                  setViewMode('satellite');
+                  setBasemap('satellite');
+                }}
+                onSwitchToMap={() => {
+                  setViewMode('standard');
+                  setBasemap('street');
+                }}
+              />
+            </div>
           </div>
         )}
       </div>
@@ -1022,6 +1072,120 @@ export const ExploreRoadsPage: React.FC<ExploreRoadsPageProps> = ({
                   {routeSummary.uninspected_segments}
                 </span>
                 <span className="text-[10px] text-slate-500">Pending Survey</span>
+              </div>
+            </div>
+
+            {/* Custom Road Inspection Range (10 km Default, Max 20 km) */}
+            <div className="p-4 bg-gradient-to-r from-blue-50/70 via-indigo-50/50 to-slate-50 rounded-2xl border border-blue-200/80 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center space-x-2">
+                  <div className="p-1.5 bg-blue-600 text-white rounded-lg">
+                    <SlidersHorizontal className="w-3.5 h-3.5" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                      Custom Road Inspection Range
+                    </h3>
+                    <p className="text-[11px] text-slate-500">
+                      Select and explore any 10–20 km corridor window along this driving route.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Range Length Selector */}
+                <div className="flex items-center space-x-1.5 text-xs font-bold">
+                  <span className="text-[10px] uppercase text-slate-500 font-bold mr-1">Window Size:</span>
+                  {[5, 10, 15, 20].map((len) => (
+                    <button
+                      key={len}
+                      onClick={() => handleChangeRangeLength(len)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-mono transition cursor-pointer ${
+                        Math.round(rangeLengthKm) === len
+                          ? 'bg-blue-600 text-white shadow-xs'
+                          : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
+                      }`}
+                    >
+                      {len} km {len === 10 ? '(Default)' : len === 20 ? '(Max)' : ''}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Range Navigation & Scrubber */}
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center pt-1">
+                {/* Prev Button */}
+                <div className="md:col-span-3">
+                  <button
+                    onClick={() => handleMoveRange('prev')}
+                    disabled={rangeStartKm <= 0.05}
+                    id="btn-range-prev"
+                    className="w-full px-3 py-2 bg-white hover:bg-slate-100 text-slate-800 disabled:opacity-40 disabled:hover:bg-white rounded-xl border border-slate-200 font-bold text-xs flex items-center justify-center space-x-1 transition cursor-pointer"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                    <span>◀ Prev {rangeLengthKm} km</span>
+                  </button>
+                </div>
+
+                {/* Range Scrubber Slider & Current Position */}
+                <div className="md:col-span-6 space-y-1">
+                  <div className="flex items-center justify-between text-[11px] font-bold">
+                    <span className="text-slate-500 font-mono">km 0.0</span>
+                    <span className="text-blue-700 font-black px-2 py-0.5 rounded-full bg-blue-100/80 border border-blue-200">
+                      Inspecting: km {(rangeInfo?.start_km ?? rangeStartKm).toFixed(1)} &rarr; km {(rangeInfo?.end_km ?? (rangeStartKm + rangeLengthKm)).toFixed(1)} of {routeSummary.total_distance_km} km
+                    </span>
+                    <span className="text-slate-500 font-mono">km {routeSummary.total_distance_km}</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max={Math.max(0, routeSummary.total_distance_km - rangeLengthKm)}
+                    step="0.5"
+                    value={rangeStartKm}
+                    onChange={(e) => handleSliderRangeChange(parseFloat(e.target.value))}
+                    className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                  />
+                </div>
+
+                {/* Next Button */}
+                <div className="md:col-span-3">
+                  <button
+                    onClick={() => handleMoveRange('next')}
+                    disabled={rangeInfo ? !rangeInfo.has_next : (rangeStartKm + rangeLengthKm >= routeSummary.total_distance_km)}
+                    id="btn-range-next"
+                    className="w-full px-3 py-2 bg-white hover:bg-slate-100 text-slate-800 disabled:opacity-40 disabled:hover:bg-white rounded-xl border border-slate-200 font-bold text-xs flex items-center justify-center space-x-1 transition cursor-pointer"
+                  >
+                    <span>Next {rangeLengthKm} km ▶</span>
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Active Window Defect Telemetry */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 border-t border-blue-200/50 text-xs">
+                <div className="bg-white/80 p-2 rounded-xl border border-slate-200/80">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase block">Window Slices</span>
+                  <span className="font-extrabold text-slate-800 font-mono">
+                    {rangeSegments.length} slices ({(rangeSegments.length * 0.1).toFixed(1)} km)
+                  </span>
+                </div>
+                <div className="bg-white/80 p-2 rounded-xl border border-slate-200/80">
+                  <span className="text-[10px] text-blue-600 font-bold uppercase block">Ground Inspected</span>
+                  <span className="font-extrabold text-blue-800 font-mono">
+                    {rangeInfo?.inspected_count ?? 0} of {rangeSegments.length}
+                  </span>
+                </div>
+                <div className="bg-white/80 p-2 rounded-xl border border-slate-200/80">
+                  <span className="text-[10px] text-red-600 font-bold uppercase block">Potholes in Window</span>
+                  <span className="font-extrabold text-red-700 font-mono">
+                    {rangeInfo?.pothole_count ?? 0} detected
+                  </span>
+                </div>
+                <div className="bg-white/80 p-2 rounded-xl border border-slate-200/80">
+                  <span className="text-[10px] text-amber-600 font-bold uppercase block">Cracks in Window</span>
+                  <span className="font-extrabold text-amber-700 font-mono">
+                    {rangeInfo?.crack_count ?? 0} detected
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -1137,6 +1301,13 @@ export const ExploreRoadsPage: React.FC<ExploreRoadsPageProps> = ({
                         {selectedRouteSegment.defects.length}
                       </span>
                     </div>
+                    <button
+                      onClick={() => setViewMode('street')}
+                      className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold flex items-center space-x-1 transition cursor-pointer"
+                    >
+                      <Camera className="w-3 h-3" />
+                      <span>Street View</span>
+                    </button>
                   </div>
                 </div>
               )}

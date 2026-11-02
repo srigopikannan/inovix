@@ -100,3 +100,27 @@ def test_live_road_inspect():
     assert uninspected_data["status"] == "NOT_INSPECTED"
     assert uninspected_data["prompt_upload"] is True
     assert "No verified street-level mobile scanner footage" in uninspected_data["message"]
+
+def test_calculate_route_custom_range():
+    # Test Tiruppur to Pollachi with custom range: 10km length, starting at km 5.0
+    payload = {
+        "source": {"lat": 11.1085, "lng": 77.3411, "name": "Tiruppur"},
+        "destination": {"lat": 10.6609, "lng": 77.0048, "name": "Pollachi"},
+        "range_start_km": 5.0,
+        "range_length_km": 10.0
+    }
+    response = client.post("/api/routing/route", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "SUCCESS"
+    assert "range_info" in data
+    assert "range_segments" in data
+    range_info = data["range_info"]
+    assert range_info["start_km"] == 5.0
+    assert range_info["length_km"] <= 10.0
+    assert range_info["has_prev"] is True
+    assert len(data["range_segments"]) > 0
+    # Every segment in range_segments must have in_selected_range == True
+    for s in data["range_segments"]:
+        assert s["in_selected_range"] is True
+

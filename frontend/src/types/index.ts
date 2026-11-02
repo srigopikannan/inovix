@@ -202,6 +202,27 @@ export interface RouteSegment100m {
   }>;
   last_inspected: string | null;
   verification_source: string;
+  in_selected_range?: boolean;
+}
+
+export interface RouteRangeInfo {
+  start_km: number;
+  end_km: number;
+  length_km: number;
+  total_route_km: number;
+  has_prev: boolean;
+  has_next: boolean;
+  prev_start_km: number;
+  next_start_km: number;
+  range_segments_count: number;
+  pothole_count: number;
+  crack_count: number;
+  critical_count: number;
+  poor_count: number;
+  moderate_count: number;
+  good_count: number;
+  inspected_count: number;
+  uninspected_count: number;
 }
 
 export interface RouteInspectionSummary {
@@ -249,6 +270,8 @@ export interface RouteInspectionResponse {
   };
   segments: RouteSegment100m[];
   summary: RouteInspectionSummary;
+  range_info?: RouteRangeInfo;
+  range_segments?: RouteSegment100m[];
   alternatives?: Array<{
     route_index: number;
     title: string;

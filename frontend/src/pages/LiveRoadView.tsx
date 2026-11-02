@@ -8,6 +8,7 @@ import type {
   LocationSuggestion,
   LiveRoadInspectResponse
 } from '../types';
+import { StreetViewPanoramaViewer } from '../components/StreetViewPanoramaViewer';
 import {
   Search,
   MapPin,
@@ -877,116 +878,25 @@ export const LiveRoadView: React.FC<LiveRoadViewProps> = ({
               </div>
             </div>
 
-            {/* Viewport 3: Street-Level Inspection Viewport (Interactive Virtual Driver & Mobile Scanner View) */}
+            {/* Viewport 3: Street-Level Inspection Viewport (Interactive 360° Panorama & Mobile Scanner Telemetry) */}
             {viewMode === 'street_level' && (
-              <div className="relative mt-2 rounded-xl overflow-hidden border border-slate-200 bg-slate-950" style={{ height: '560px' }}>
-                {inspectionResult?.status === 'INSPECTED' && (selectedDefect || inspectionResult.inspection.images.length > 0) ? (
-                  <div className="relative w-full h-full flex items-center justify-center">
-                    <img
-                      src={
-                        showAIBoundingBoxes
-                          ? (selectedDefect?.annotated_image_url || selectedDefect?.image_url || selectedEvidenceSample)
-                          : (selectedDefect?.image_url || selectedEvidenceSample)
-                      }
-                      alt="Street-Level Optical Scanner Frame"
-                      className="w-full h-full object-cover"
-                    />
-
-                    {/* Scanner Optical HUD Overlay */}
-                    <div className="absolute inset-0 pointer-events-none border border-cyan-500/30 flex flex-col justify-between p-4">
-                      {/* Top HUD Bar */}
-                      <div className="flex items-center justify-between bg-black/60 backdrop-blur-md px-3.5 py-2 rounded-xl border border-white/10 text-white text-xs font-mono">
-                        <div className="flex items-center space-x-2">
-                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-                          <span className="font-bold text-cyan-400">MOBILE SCANNER HUD #04</span>
-                          <span className="text-slate-400">|</span>
-                          <span className="text-slate-300">CALIBRATED GROUND RESOLUTION</span>
-                        </div>
-                        <div className="flex items-center space-x-3 text-[11px]">
-                          <span>SPEED: <b>42 KM/H</b></span>
-                          <span>IRI: <b>2.2 M/KM</b></span>
-                          <span>CHAINAGE: <b>{inspectionResult.road.chainage || 'CH 0+800'}</b></span>
-                        </div>
-                      </div>
-
-                      {/* Optical Crosshair Reticle in Center */}
-                      <div className="self-center flex flex-col items-center justify-center opacity-60">
-                        <Crosshair className="w-16 h-16 text-cyan-400" />
-                        <span className="text-[10px] font-mono text-cyan-300 bg-black/50 px-2 py-0.5 rounded mt-1">
-                          OPTICAL CENTER: [{selectedLocation.lat.toFixed(4)}, {selectedLocation.lng.toFixed(4)}]
-                        </span>
-                      </div>
-
-                      {/* Bottom HUD Bar */}
-                      <div className="flex items-center justify-between bg-black/70 backdrop-blur-md px-4 py-2 rounded-xl border border-white/10 text-white text-xs font-mono">
-                        <div>
-                          <span className="text-slate-400">TARGET: </span>
-                          <b className="text-white">{selectedRoadName}</b>
-                        </div>
-                        <div className="text-slate-300 text-[11px]">
-                          CAPTURED: <b>{inspectionResult.inspection.inspection_date || '2026-10-31 09:30 UTC'}</b>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Interactive Overlay Toggle Pill */}
-                    <div className="absolute top-16 right-4 z-20 flex items-center space-x-2 bg-white/90 backdrop-blur-md p-1.5 rounded-xl border border-slate-200 shadow-md text-xs">
-                      <button
-                        onClick={() => setShowAIBoundingBoxes(!showAIBoundingBoxes)}
-                        className={`px-3 py-1 rounded-lg font-bold transition cursor-pointer ${
-                          showAIBoundingBoxes
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                        }`}
-                      >
-                        {showAIBoundingBoxes ? 'AI Annotations: ON' : 'AI Annotations: OFF'}
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  /* Honest Representation: When Street-Level Imagery is Unavailable */
-                  <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center text-white bg-radial from-slate-900 to-slate-950">
-                    <div className="w-16 h-16 rounded-2xl bg-slate-800 border border-slate-700 flex items-center justify-center text-amber-400 mb-4 shadow-inner">
-                      <Camera className="w-8 h-8" />
-                    </div>
-                    <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30 uppercase tracking-wider mb-2">
-                      Honest Data Representation
-                    </span>
-                    <h3 className="text-lg font-bold text-white max-w-md">
-                      No Verified Street-Level Mobile Scanner Footage on Record
-                    </h3>
-                    <p className="text-xs text-slate-400 max-w-lg mt-1.5 leading-relaxed">
-                      Street-level mobile optical cameras have not traversed this coordinate yet. Top-down satellite imagery is active, but micro-defects (potholes, cracks) cannot be fabricated without optical road telemetry.
-                    </p>
-
-                    <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-                      <button
-                        onClick={() => {
-                          runSampleDetection('/uploads/sample_pothole_nh44.jpg');
-                        }}
-                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer flex items-center space-x-2"
-                      >
-                        <Sparkles className="w-4 h-4" />
-                        <span>Simulate with Sample Pothole Scan</span>
-                      </button>
-                      <button
-                        onClick={() => {
-                          runSampleDetection('/uploads/sample_crack_nh44.jpg');
-                        }}
-                        className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold transition border border-slate-700 cursor-pointer flex items-center space-x-2"
-                      >
-                        <Activity className="w-4 h-4" />
-                        <span>Simulate with Crack Scan</span>
-                      </button>
-                      <button
-                        onClick={() => setViewMode('satellite')}
-                        className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-medium transition border border-slate-700 cursor-pointer"
-                      >
-                        Return to Satellite Map
-                      </button>
-                    </div>
-                  </div>
-                )}
+              <div className="mt-2">
+                <StreetViewPanoramaViewer
+                  lat={selectedDefect?.lat ?? selectedLocation.lat}
+                  lng={selectedDefect?.lng ?? selectedLocation.lng}
+                  roadName={selectedRoadName}
+                  segmentId={selectedDefect?.segment_id}
+                  surveyFrameUrl={
+                    selectedDefect?.annotated_image_url ||
+                    selectedDefect?.image_url ||
+                    (inspectionResult?.inspection?.images?.[0]?.url) ||
+                    selectedEvidenceSample
+                  }
+                  surveyDefects={inspectionResult?.inspection?.detected_defects || []}
+                  onClose={() => setViewMode('satellite')}
+                  onSwitchToSatellite={() => setViewMode('satellite')}
+                  onSwitchToMap={() => setViewMode('street')}
+                />
               </div>
             )}
           </div>
@@ -1185,11 +1095,11 @@ export const LiveRoadView: React.FC<LiveRoadViewProps> = ({
                 )}
 
                 {uploadDetectionResult && (
-                  <div className="space-y-2 pt-2 border-t border-slate-200">
+                  <div className="space-y-3 pt-2 border-t border-slate-200">
                     <div className="font-bold text-xs text-slate-900 flex items-center justify-between">
                       <span>Inspection Detection Result</span>
                       <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                        {uploadDetectionResult.detections?.length || 0} Defects
+                        {uploadDetectionResult.detections?.length || 0} Defects Identified
                       </span>
                     </div>
                     <div className="relative rounded-xl overflow-hidden border border-slate-200 aspect-video">
@@ -1199,6 +1109,31 @@ export const LiveRoadView: React.FC<LiveRoadViewProps> = ({
                         className="w-full h-full object-cover"
                       />
                     </div>
+                    {/* Defect Telemetry Items */}
+                    {uploadDetectionResult.detections && uploadDetectionResult.detections.length > 0 && (
+                      <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                        {uploadDetectionResult.detections.map((d: any, idx: number) => (
+                          <div key={idx} className="p-2 bg-slate-50 rounded-xl border border-slate-200 text-xs flex items-center justify-between">
+                            <div>
+                              <div className="font-bold text-slate-900 flex items-center space-x-1">
+                                <span>{d.id || `POT-0${idx + 1}`}: {d.defect_type}</span>
+                                <span className={`text-[9px] px-1.5 py-0.2 rounded font-mono ${d.severity === 'CRITICAL' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-800'}`}>
+                                  {d.severity}
+                                </span>
+                              </div>
+                              <div className="text-[10px] text-slate-500">
+                                {d.measurements?.metric_dimensions?.diameter_cm
+                                  ? `Dia: ${d.measurements.metric_dimensions.diameter_cm} cm`
+                                  : `L: ${d.measurements?.metric_dimensions?.length_cm || Math.round(d.pixel_length * 0.14)} cm`} &bull; Area: {d.measurements?.metric_dimensions?.estimated_area_cm2 || Math.round((d.contour_area_px || 4000) * 0.0196)} cm²
+                              </div>
+                            </div>
+                            <span className="font-mono text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                              {Math.round(d.confidence * 100)}%
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

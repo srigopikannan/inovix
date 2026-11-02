@@ -242,12 +242,21 @@ export const api = {
     source: { lat: number; lng: number; name?: string },
     destination: { lat: number; lng: number; name?: string },
     roadName?: string,
-    routeIndex?: number
+    routeIndex?: number,
+    rangeStartKm?: number,
+    rangeLengthKm?: number
   ): Promise<RouteInspectionResponse> {
     const res = await fetch(`${API_BASE}/routing/route`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ source, destination, road_name: roadName, route_index: routeIndex ?? 0 }),
+      body: JSON.stringify({
+        source,
+        destination,
+        road_name: roadName,
+        route_index: routeIndex ?? 0,
+        range_start_km: rangeStartKm ?? 0.0,
+        range_length_km: rangeLengthKm ?? 10.0
+      }),
     });
     if (!res.ok) throw new Error('Failed to calculate road route and defect telemetry');
     return res.json();
