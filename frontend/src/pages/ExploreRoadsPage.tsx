@@ -662,11 +662,18 @@ export const ExploreRoadsPage: React.FC<ExploreRoadsPageProps> = ({
                         setShowSourceDropdown(true);
                       }}
                       onFocus={() => setShowSourceDropdown(true)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleRunInspection(0);
+                        }
+                      }}
                       placeholder="Enter starting city/town in TN..."
                       className="w-full text-xs font-semibold text-slate-800 focus:outline-none bg-transparent"
                     />
                     {sourceSearch && (
                       <button
+                        type="button"
                         onClick={() => {
                           setSourceSearch('');
                           setSourcePoint(null);
@@ -683,6 +690,7 @@ export const ExploreRoadsPage: React.FC<ExploreRoadsPageProps> = ({
                     <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-[1000] max-h-48 overflow-y-auto">
                       {sourceSuggestions.map((loc, i) => (
                         <button
+                          type="button"
                           key={i}
                           onClick={() => {
                             setSourcePoint({ lat: loc.lat, lng: loc.lng, name: loc.display_name });
@@ -721,11 +729,18 @@ export const ExploreRoadsPage: React.FC<ExploreRoadsPageProps> = ({
                         setShowDestDropdown(true);
                       }}
                       onFocus={() => setShowDestDropdown(true)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleRunInspection(0);
+                        }
+                      }}
                       placeholder="Enter destination in Tamil Nadu..."
                       className="w-full text-xs font-semibold text-slate-800 focus:outline-none bg-transparent"
                     />
                     {destSearch && (
                       <button
+                        type="button"
                         onClick={() => {
                           setDestSearch('');
                           setDestPoint(null);
@@ -742,6 +757,7 @@ export const ExploreRoadsPage: React.FC<ExploreRoadsPageProps> = ({
                     <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-[1000] max-h-48 overflow-y-auto">
                       {destSuggestions.map((loc, i) => (
                         <button
+                          type="button"
                           key={i}
                           onClick={() => {
                             setDestPoint({ lat: loc.lat, lng: loc.lng, name: loc.display_name });
@@ -774,6 +790,7 @@ export const ExploreRoadsPage: React.FC<ExploreRoadsPageProps> = ({
                     <div className="space-y-1">
                       {availableAlternatives.map((alt) => (
                         <button
+                          type="button"
                           key={alt.route_index}
                           onClick={() => handleRunInspection(alt.route_index)}
                           className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition flex items-center justify-between cursor-pointer ${
@@ -794,7 +811,13 @@ export const ExploreRoadsPage: React.FC<ExploreRoadsPageProps> = ({
 
                 {/* 3. Primary "INSPECT THIS ROUTE" Button */}
                 <button
-                  onClick={() => handleRunInspection(0)}
+                  type="button"
+                  id="btn-inspect-this-route"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleRunInspection(0);
+                  }}
                   disabled={loading || (!sourcePoint && !sourceSearch.trim()) || (!destPoint && !destSearch.trim())}
                   className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white rounded-xl font-extrabold text-xs tracking-wide transition shadow-md flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50"
                 >
@@ -810,7 +833,12 @@ export const ExploreRoadsPage: React.FC<ExploreRoadsPageProps> = ({
                       <div className="font-bold">Inspection Notice</div>
                       <div className="text-[11px] leading-tight text-red-600 mt-0.5">{routeError}</div>
                       <button
-                        onClick={() => handleRunInspection(0)}
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleRunInspection(0);
+                        }}
                         className="mt-1 text-[11px] font-bold text-red-800 underline hover:no-underline cursor-pointer"
                       >
                         Retry Inspection

@@ -70,6 +70,8 @@ export function App() {
             <Route path="/settings" element={<SettingsSimplePage />} />
 
             {/* Backwards-compatible aliases for legacy routes */}
+            <Route path="/ai-inspection" element={<Navigate to="/inspect" replace />} />
+            <Route path="/explore-roads" element={<Navigate to="/explore" replace />} />
             <Route path="/live-view" element={<Navigate to="/live-road-view" replace />} />
             <Route path="/overview" element={<Navigate to="/" replace />} />
             <Route path="/command-center" element={<Navigate to="/explore" replace />} />
